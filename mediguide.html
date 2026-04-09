@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediGuide — Your Personal AI Pharmacist</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cyan: #0099BB;
+    --pink: #E8185A;
+    --green: #00A855;
+    --orange: #E05A00;
+    --yellow: #B89000;
+    --blue: #3B82F6;
+    --bg: #F0F4F8;
+    --card: #FFFFFF;
+    --card2: #E8EEF4;
+    --border: rgba(0,0,0,0.09);
+    --text: #1E293B;
+    --muted: #64748B;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 72px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    z-index: 100;
+    gap: 8px;
+  }
+
+  .logo-mark {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--cyan), var(--pink));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    color: #FFFFFF;
+    flex-shrink: 0;
+  }
+
+  .nav-divider { width: 32px; height: 1px; background: var(--border); margin: 8px 0; }
+
+  .nav-btn {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .nav-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+  .nav-btn.active { background: rgba(0,153,187,0.12); color: var(--cyan); }
+  .nav-btn.active::before {
+    content: '';
+    position: absolute;
+    left: -1px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 24px;
+    background: var(--cyan);
+    border-radius: 0 3px 3px 0;
+  }
+
+  .nav-tooltip {
+    position: absolute;
+    left: 60px;
+    background: var(--card2);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: all 0.15s;
+    border: 1px solid var(--border);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .nav-btn:hover .nav-tooltip { opacity: 1; transform: translateX(0); }
+
+  /* ── MAIN CONTENT ── */
+  .main {
+    margin-left: 72px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    height: 60px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 28px;
+    gap: 16px;
+    background: rgba(240,244,248,0.92);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 50;
+  }
+
+  .page-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  .badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(0,255,135,0.12);
+    color: var(--green);
+    border: 1px solid rgba(0,255,135,0.25);
+  }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), var(--pink));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; padding: 28px; animation: fadeIn 0.3s ease; }
+  .screen.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SHARED COMPONENTS ── */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .card-accent {
+    border-top: 2px solid var(--cyan);
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: #0F172A;
+  }
+
+  .sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+  .btn {
+    padding: 11px 22px;
+    border-radius: 10px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-primary {
+    background: var(--cyan);
+    color: var(--bg);
+  }
+  .btn-primary:hover { background: #33ebff; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,229,255,0.3); }
+
+  .btn-ghost {
+    background: rgba(0,0,0,0.05);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: rgba(0,0,0,0.09); }
+
+  .btn-danger {
+    background: rgba(255,45,120,0.12);
+    color: var(--pink);
+    border: 1px solid rgba(255,45,120,0.25);
+  }
+  .btn-danger:hover { background: rgba(255,45,120,0.2); }
+
+  input, textarea, select {
+    width: 100%;
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--cyan); }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+  select option { background: #FFFFFF; }
+  label { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .flex { display: flex; gap: 12px; }
+  .flex-col { display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── HOME SCREEN ── */
+  .hero-banner {
+    background: linear-gradient(135deg, rgba(0,229,255,0.08) 0%, rgba(255,45,120,0.06) 100%);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-radius: 20px;
+    padding: 32px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-banner::after {
+    content: '💊';
+    position: absolute;
+    right: 32px; top: 50%; transform: translateY(-50%);
+    font-size: 72px;
+    opacity: 0.15;
+  }
+  .hero-banner h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .hero-banner h1 span { color: var(--cyan); }
+  .hero-banner p { color: var(--muted); font-size: 15px; max-width: 500px; margin-bottom: 20px; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: transform 0.2s;
+  }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-val { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .qa-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+  .qa-card:hover { border-color: var(--cyan); background: rgba(0,153,187,0.05); transform: translateY(-2px); }
+  .qa-icon { font-size: 28px; margin-bottom: 10px; }
+  .qa-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; color: #0F172A; }
+  .qa-desc { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* ── PRESCRIPTION ANALYZER ── */
+  .upload-zone {
+    border: 2px dashed rgba(0,229,255,0.3);
+    border-radius: 16px;
+    padding: 48px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0,153,187,0.03);
+    margin-bottom: 20px;
+  }
+  .upload-zone:hover { border-color: var(--cyan); background: rgba(0,153,187,0.06); }
+  .upload-zone .icon { font-size: 48px; margin-bottom: 12px; }
+  .upload-zone h3 { font-family: 'Syne', sans-serif; font-weight: 600; margin-bottom: 6px; }
+  .upload-zone p { color: var(--muted); font-size: 13px; }
+
+  .medicine-table { width: 100%; border-collapse: collapse; }
+  .medicine-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .medicine-table td {
+    padding: 12px 14px;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .medicine-table tr:hover td { background: rgba(0,0,0,0.02); }
+
+  .tag {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tag-safe { background: rgba(0,255,135,0.12); color: var(--green); }
+  .tag-warn { background: rgba(255,214,0,0.12); color: var(--yellow); }
+  .tag-danger { background: rgba(255,45,120,0.12); color: var(--pink); }
+  .tag-info { background: rgba(0,229,255,0.12); color: var(--cyan); }
+
+  /* ── DRUG INTERACTION ── */
+  .interaction-card {
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .int-safe { background: rgba(0,255,135,0.07); border: 1px solid rgba(0,255,135,0.2); }
+  .int-warn { background: rgba(255,214,0,0.07); border: 1px solid rgba(255,214,0,0.2); }
+  .int-danger { background: rgba(255,45,120,0.07); border: 1px solid rgba(255,45,120,0.25); }
+
+  .int-icon { font-size: 24px; flex-shrink: 0; }
+  .int-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .int-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ── NATURE CURE ── */
+  .remedy-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 12px;
+    display: flex; gap: 16px;
+  }
+  .remedy-icon { font-size: 32px; flex-shrink: 0; }
+  .remedy-name { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 15px; color: var(--green); margin-bottom: 4px; }
+  .remedy-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .severity-bar { display: flex; gap: 6px; margin-bottom: 16px; }
+  .sev-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .sev-btn.active-mild { background: rgba(0,255,135,0.12); color: var(--green); border-color: rgba(0,255,135,0.3); }
+  .sev-btn.active-mod { background: rgba(255,214,0,0.12); color: var(--yellow); border-color: rgba(255,214,0,0.3); }
+  .sev-btn.active-serious { background: rgba(255,45,120,0.12); color: var(--pink); border-color: rgba(255,45,120,0.3); }
+
+  /* ── REMINDERS ── */
+  .reminder-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+  }
+  .reminder-item:hover { border-color: rgba(0,229,255,0.2); }
+  .reminder-time {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--cyan);
+    min-width: 60px;
+  }
+  .reminder-name { font-weight: 500; font-size: 14px; color: #0F172A; }
+  .reminder-sub { font-size: 12px; color: var(--muted); }
+  .reminder-toggle {
+    margin-left: auto;
+    width: 40px; height: 22px;
+    background: rgba(0,229,255,0.15);
+    border-radius: 11px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .reminder-toggle.on { background: var(--cyan); }
+  .reminder-toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    top: 3px; left: 3px;
+    transition: transform 0.2s;
+  }
+  .reminder-toggle.on::after { transform: translateX(18px); }
+
+  /* ── HOSPITAL FINDER ── */
+  .map-placeholder {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    height: 220px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .map-placeholder::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 40% 50%, rgba(0,229,255,0.06) 0%, transparent 60%),
+                radial-gradient(circle at 70% 30%, rgba(255,45,120,0.04) 0%, transparent 50%);
+  }
+  .map-pin { font-size: 40px; }
+
+  .hospital-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .hospital-item:hover { border-color: rgba(0,229,255,0.2); transform: translateX(4px); }
+  .hosp-icon { width: 40px; height: 40px; background: rgba(255,107,0,0.12); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .hosp-name { font-weight: 600; font-size: 14px; color: #0F172A; }
+  .hosp-sub { font-size: 12px; color: var(--muted); }
+  .hosp-dist { margin-left: auto; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; color: var(--orange); }
+
+  /* ── HEALTOGETHER ── */
+  .mentor-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex; gap: 14px; align-items: flex-start;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+  }
+  .mentor-card:hover { border-color: rgba(255,45,120,0.2); }
+  .mentor-av {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .mentor-name { font-weight: 600; font-size: 14px; color: #0F172A; margin-bottom: 2px; }
+  .mentor-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .mentor-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mentor-tag { padding: 3px 8px; border-radius: 6px; font-size: 11px; background: rgba(0,0,0,0.06); color: var(--muted); }
+
+  .chat-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .chat-messages { max-height: 260px; overflow-y: auto; margin-bottom: 16px; flex-direction: column; display: flex; gap: 12px; }
+  .msg { max-width: 75%; }
+  .msg-them { align-self: flex-start; }
+  .msg-me { align-self: flex-end; }
+  .msg-bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .msg-them .msg-bubble { background: #EDF2F7; color: var(--text); border-bottom-left-radius: 4px; }
+  .msg-me .msg-bubble { background: rgba(0,153,187,0.12); color: var(--cyan); border-bottom-right-radius: 4px; }
+  .msg-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .msg-me .msg-meta { text-align: right; }
+
+  /* ── ALERTS ── */
+  .alert {
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 13px;
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .alert-info { background: rgba(0,153,187,0.08); border: 1px solid rgba(0,153,187,0.2); color: var(--cyan); }
+  .alert-warn { background: rgba(255,214,0,0.08); border: 1px solid rgba(255,214,0,0.2); color: var(--yellow); }
+
+  /* ── LOADING PULSE ── */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .loading { animation: pulse 1.4s ease-in-out infinite; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar-wrap { background: rgba(0,0,0,0.08); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 4px; }
+
+  /* ── RESULT BOX ── */
+  .result-box {
+    background: rgba(0,153,187,0.05);
+    border: 1px solid rgba(0,153,187,0.2);
+    border-radius: 14px;
+    padding: 20px;
+    margin-top: 16px;
+    display: none;
+  }
+  .result-box.show { display: block; animation: fadeIn 0.3s ease; }
+
+  /* adherence ring */
+  .ring-wrap { display: flex; align-items: center; gap: 24px; }
+  .ring { position: relative; width: 100px; height: 100px; flex-shrink: 0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="logo-mark">MG</div>
+
+  <button class="nav-btn active" onclick="showScreen('home', this)" title="">
+    🏠
+    <span class="nav-tooltip">Home</span>
+  </button>
+  <button class="nav-btn" onclick="showScreen('prescription', this)">
+    📋
+    <span class="nav-tooltip">Prescription Analyzer</span>
+  </button>
+  <button class="nav-btn" onclick="showScreen('interaction', this)">
+    ⚠️
+    <span class="nav-tooltip">Drug Interaction</span>
+  </button>
+  <button class="nav-btn" onclick="showScreen('nature', this)">
+    🌿
+    <span class="nav-tooltip">NatureCure</span>
+  </button>
+  <div class="nav-divider"></div>
+  <button class="nav-btn" onclick="showScreen('reminders', this)">
+    🔔
+    <span class="nav-tooltip">Reminders</span>
+  </button>
+  <button class="nav-btn" onclick="showScreen('hospital', this)">
+    🏥
+    <span class="nav-tooltip">Hospital Finder</span>
+  </button>
+  <button class="nav-btn" onclick="showScreen('heal', this)">
+    🤝
+    <span class="nav-tooltip">HealTogether</span>
+  </button>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <span class="page-title" id="page-title">Home</span>
+    <div class="topbar-right">
+      <span class="badge">✓ AI Active</span>
+      <div class="avatar">DK</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       HOME
+  ══════════════════════════════════════ -->
+  <div class="screen active" id="screen-home">
+    <div class="hero-banner">
+      <h1>Good morning, <span>Daksh</span> 👋</h1>
+      <p>Your personal AI pharmacist — read prescriptions, check interactions, set reminders, and find care near you.</p>
+      <div class="flex">
+        <button class="btn btn-primary" onclick="showScreen('prescription', document.querySelector('[onclick*=prescription]'))">📋 Analyze Prescription</button>
+        <button class="btn btn-ghost" onclick="showScreen('reminders', document.querySelector('[onclick*=reminders]'))">🔔 Today's Reminders</button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--cyan)">3</div>
+        <div class="stat-label">Medicines Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--green)">87%</div>
+        <div class="stat-label">Adherence This Week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--orange)">2</div>
+        <div class="stat-label">Upcoming Doses</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--pink)">1</div>
+        <div class="stat-label">Interaction Alert</div>
+      </div>
+    </div>
+
+    <div class="section-label">Quick Actions</div>
+    <div class="quick-actions">
+      <div class="qa-card" onclick="showScreen('prescription', document.querySelector('[onclick*=prescription]'))">
+        <div class="qa-icon">📋</div>
+        <div class="qa-title">Scan Prescription</div>
+        <div class="qa-desc">Upload photo or PDF of your Rx</div>
+      </div>
+      <div class="qa-card" onclick="showScreen('interaction', document.querySelector('[onclick*=interaction]'))">
+        <div class="qa-icon">🔬</div>
+        <div class="qa-title">Check Drug Interactions</div>
+        <div class="qa-desc">Enter medicines to check safety</div>
+      </div>
+      <div class="qa-card" onclick="showScreen('nature', document.querySelector('[onclick*=nature]'))">
+        <div class="qa-icon">🌿</div>
+        <div class="qa-title">Home Remedies</div>
+        <div class="qa-desc">Natural solutions for minor issues</div>
+      </div>
+      <div class="qa-card" onclick="showScreen('hospital', document.querySelector('[onclick*=hospital]'))">
+        <div class="qa-icon">🏥</div>
+        <div class="qa-title">Find Hospital</div>
+        <div class="qa-desc">Nearest hospitals by specialty</div>
+      </div>
+      <div class="qa-card" onclick="showScreen('heal', document.querySelector('[onclick*=heal]'))">
+        <div class="qa-icon">🤝</div>
+        <div class="qa-title">HealTogether</div>
+        <div class="qa-desc">Connect with verified survivors</div>
+      </div>
+      <div class="qa-card" onclick="showScreen('reminders', document.querySelector('[onclick*=reminders]'))">
+        <div class="qa-icon">⏰</div>
+        <div class="qa-title">Set Reminder</div>
+        <div class="qa-desc">Auto-schedule from prescription</div>
+      </div>
+    </div>
+
+    <div class="alert alert-warn">
+      ⚠️ <span><strong>Interaction Alert:</strong> Aspirin + Ibuprofen detected in your active medicines. <a href="#" style="color:var(--yellow);text-decoration:underline" onclick="showScreen('interaction', document.querySelector('[onclick*=interaction]'));return false">View details →</a></span>
+    </div>
+    <div class="alert alert-info">
+      💊 <span>Next dose: <strong>Metformin 500mg</strong> due at <strong>2:00 PM</strong> — with food.</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       PRESCRIPTION ANALYZER
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-prescription">
+    <h2>Prescription Analyzer</h2>
+    <p class="sub">Upload your prescription photo or PDF — our AI extracts medicines, doses & timing.</p>
+
+    <div class="upload-zone" onclick="simulateAnalysis()" id="upload-zone">
+      <div class="icon">📄</div>
+      <h3>Drop prescription here or click to upload</h3>
+      <p>Supports handwritten & printed prescriptions · JPG, PNG, PDF</p>
+      <br>
+      <button class="btn btn-primary" style="pointer-events:none">📤 Upload Prescription</button>
+    </div>
+
+    <div id="analysis-loading" style="display:none;margin-bottom:20px;">
+      <div class="card" style="text-align:center;padding:32px">
+        <div style="font-size:40px;margin-bottom:12px" class="loading">🔍</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:8px">Analyzing Prescription...</div>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:20px">OCR scanning · Medicine extraction · Safety check</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="analysis-progress" style="width:0%;background:var(--cyan)"></div></div>
+      </div>
+    </div>
+
+    <div id="analysis-result" class="result-box show">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <span style="font-size:20px">✅</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:700;color:#0F172A;font-size:16px">Analysis Complete — 3 Medicines Found</span>
+        <span class="tag tag-safe" style="margin-left:auto">2 Safe</span>
+        <span class="tag tag-warn">1 Caution</span>
+      </div>
+
+      <table class="medicine-table">
+        <thead>
+          <tr>
+            <th>Medicine</th>
+            <th>Dosage</th>
+            <th>Timing</th>
+            <th>Duration</th>
+            <th>Status</th>
+            <th>Plain Language</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Metformin</strong></td>
+            <td>500mg</td>
+            <td>Twice daily (8AM, 8PM)</td>
+            <td>30 days</td>
+            <td><span class="tag tag-safe">● Safe</span></td>
+            <td style="color:var(--muted);font-size:13px">Blood sugar control — take with meals</td>
+          </tr>
+          <tr>
+            <td><strong>Aspirin</strong></td>
+            <td>75mg</td>
+            <td>Once daily (morning)</td>
+            <td>Ongoing</td>
+            <td><span class="tag tag-warn">⚠ Caution</span></td>
+            <td style="color:var(--muted);font-size:13px">Blood thinner — avoid with Ibuprofen</td>
+          </tr>
+          <tr>
+            <td><strong>Pantoprazole</strong></td>
+            <td>40mg</td>
+            <td>Before breakfast</td>
+            <td>14 days</td>
+            <td><span class="tag tag-safe">● Safe</span></td>
+            <td style="color:var(--muted);font-size:13px">Acidity/heartburn relief — take empty stomach</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="showScreen('reminders', document.querySelector('[onclick*=reminders]'))">🔔 Auto-Set Reminders</button>
+        <button class="btn btn-ghost" onclick="showScreen('interaction', document.querySelector('[onclick*=interaction]'))">🔬 Check Interactions</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       DRUG INTERACTION CHECKER
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-interaction">
+    <h2>Drug Interaction Checker</h2>
+    <p class="sub">Enter medicine names to detect dangerous combinations, overdose risks & safety alerts.</p>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div>
+          <label>Medicine 1</label>
+          <input type="text" id="drug1" placeholder="e.g. Aspirin" value="Aspirin">
+        </div>
+        <div>
+          <label>Medicine 2</label>
+          <input type="text" id="drug2" placeholder="e.g. Ibuprofen" value="Ibuprofen">
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div>
+          <label>Medicine 3 (optional)</label>
+          <input type="text" id="drug3" placeholder="e.g. Metformin" value="Metformin">
+        </div>
+        <div>
+          <label>Medicine 4 (optional)</label>
+          <input type="text" id="drug4" placeholder="e.g. Pantoprazole">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="checkInteractions()">🔬 Check Interactions</button>
+    </div>
+
+    <div id="interaction-result" style="display:block">
+      <div class="section-label">Interaction Results</div>
+
+      <div class="interaction-card int-danger">
+        <div class="int-icon">🚨</div>
+        <div>
+          <div class="int-title" style="color:var(--pink)">Aspirin + Ibuprofen — DANGER</div>
+          <div class="int-desc">Both are NSAIDs. Taking together significantly increases risk of gastrointestinal bleeding and reduces the cardioprotective effect of Aspirin. <strong style="color:var(--pink)">Avoid combination.</strong> Consult your doctor immediately.</div>
+        </div>
+      </div>
+
+      <div class="interaction-card int-safe">
+        <div class="int-icon">✅</div>
+        <div>
+          <div class="int-title" style="color:var(--green)">Aspirin + Metformin — SAFE</div>
+          <div class="int-desc">No significant interaction detected. Aspirin may slightly enhance the glucose-lowering effect of Metformin in some patients — monitor blood sugar levels.</div>
+        </div>
+      </div>
+
+      <div class="interaction-card int-safe">
+        <div class="int-icon">✅</div>
+        <div>
+          <div class="int-title" style="color:var(--green)">Pantoprazole + Metformin — SAFE</div>
+          <div class="int-desc">No clinically significant interaction. Pantoprazole may reduce absorption of Metformin slightly. Take Metformin with meals to minimize this effect.</div>
+        </div>
+      </div>
+
+      <div class="interaction-card int-warn">
+        <div class="int-icon">⚠️</div>
+        <div>
+          <div class="int-title" style="color:var(--yellow)">Aspirin + Pantoprazole — CAUTION</div>
+          <div class="int-desc">Pantoprazole is often prescribed alongside Aspirin to protect the stomach lining — this is intentional. However, avoid taking them at the exact same time. Take Pantoprazole 30 min before Aspirin.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       NATURE CURE
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-nature">
+    <h2>NatureCure Recommender</h2>
+    <p class="sub">Natural home remedies before reaching for medicines. Select symptom & severity.</p>
+
+    <div class="card" style="margin-bottom:20px">
+      <label>What symptom do you have?</label>
+      <select id="symptom-select" style="margin-bottom:14px" onchange="showRemedies()">
+        <option value="">Select a symptom...</option>
+        <option value="cold">Common Cold / Runny Nose</option>
+        <option value="fever">Mild Fever</option>
+        <option value="headache">Headache</option>
+        <option value="acidity">Acidity / Heartburn</option>
+        <option value="cough">Cough</option>
+        <option value="sore-throat">Sore Throat</option>
+      </select>
+
+      <label style="margin-bottom:8px">Severity Level</label>
+      <div class="severity-bar">
+        <button class="sev-btn active-mild" id="sev-mild" onclick="setSeverity('mild')">🟢 Mild</button>
+        <button class="sev-btn" id="sev-mod" onclick="setSeverity('moderate')">🟡 Moderate</button>
+        <button class="sev-btn" id="sev-serious" onclick="setSeverity('serious')">🔴 Serious</button>
+      </div>
+    </div>
+
+    <div id="remedy-results" style="display:none">
+      <div class="section-label" id="remedy-heading">Recommended Remedies</div>
+
+      <div id="remedy-list"></div>
+
+      <div id="otc-advice" style="display:none" class="alert alert-warn">
+        💊 <span>For moderate symptoms, consider OTC options like Cetirizine (antihistamine) or Paracetamol. If symptoms persist beyond 3 days, see a doctor.</span>
+      </div>
+      <div id="doctor-advice" style="display:none" class="alert" style="background:rgba(255,45,120,0.08);border:1px solid rgba(255,45,120,0.2);color:var(--pink)">
+        🚨 <span style="color:var(--pink)"><strong>Please see a doctor immediately.</strong> Serious symptoms require professional evaluation. Use Hospital Finder to locate the nearest clinic.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       REMINDERS
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-reminders">
+    <h2>Smart Medicine Reminders</h2>
+    <p class="sub">Auto-scheduled from your prescription. Push + SMS with food timing guidance.</p>
+
+    <div class="grid-2" style="margin-bottom:24px;align-items:start">
+      <div>
+        <div class="section-label">Today's Schedule</div>
+        <div id="reminder-list">
+          <div class="reminder-item">
+            <div>
+              <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:2px">✓ TAKEN</div>
+            </div>
+            <div class="reminder-time">8:00 AM</div>
+            <div>
+              <div class="reminder-name">Pantoprazole 40mg</div>
+              <div class="reminder-sub">Empty stomach · Before breakfast</div>
+            </div>
+            <button class="reminder-toggle on" onclick="toggleReminder(this)"></button>
+          </div>
+          <div class="reminder-item">
+            <div>
+              <div style="font-size:11px;color:var(--green);font-weight:600;margin-bottom:2px">✓ TAKEN</div>
+            </div>
+            <div class="reminder-time">8:30 AM</div>
+            <div>
+              <div class="reminder-name">Metformin 500mg</div>
+              <div class="reminder-sub">With breakfast · Blood sugar</div>
+            </div>
+            <button class="reminder-toggle on" onclick="toggleReminder(this)"></button>
+          </div>
+          <div class="reminder-item" style="border-color:rgba(0,229,255,0.3)">
+            <div>
+              <div style="font-size:11px;color:var(--cyan);font-weight:600;margin-bottom:2px">⏳ UPCOMING</div>
+            </div>
+            <div class="reminder-time" >2:00 PM</div>
+            <div>
+              <div class="reminder-name">Aspirin 75mg</div>
+              <div class="reminder-sub">After lunch · Blood thinner</div>
+            </div>
+            <button class="reminder-toggle on" onclick="toggleReminder(this)"></button>
+          </div>
+          <div class="reminder-item">
+            <div>
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px">◯ PENDING</div>
+            </div>
+            <div class="reminder-time">8:00 PM</div>
+            <div>
+              <div class="reminder-name">Metformin 500mg</div>
+              <div class="reminder-sub">With dinner · Blood sugar</div>
+            </div>
+            <button class="reminder-toggle" onclick="toggleReminder(this)"></button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label">Weekly Adherence</div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="ring-wrap">
+            <div class="ring">
+              <svg width="100" height="100" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,0,0,0.07)" stroke-width="10"/>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--cyan)" stroke-width="10"
+                  stroke-dasharray="264" stroke-dashoffset="34" stroke-linecap="round"/>
+              </svg>
+              <div class="ring-val">87%</div>
+            </div>
+            <div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:#0F172A;margin-bottom:4px">Great adherence! 💪</div>
+              <div style="color:var(--muted);font-size:13px">You missed 2 doses this week. Keep it up to stay on track with your treatment.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-label">Add New Reminder</div>
+        <div class="card">
+          <div style="margin-bottom:12px">
+            <label>Medicine Name</label>
+            <input type="text" id="new-med" placeholder="e.g. Vitamin D3">
+          </div>
+          <div class="grid-2" style="margin-bottom:12px">
+            <div>
+              <label>Time</label>
+              <input type="time" id="new-time" value="09:00">
+            </div>
+            <div>
+              <label>Frequency</label>
+              <select id="new-freq">
+                <option>Once daily</option>
+                <option>Twice daily</option>
+                <option>Three times daily</option>
+                <option>Weekly</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:14px">
+            <label>Food Timing</label>
+            <select id="new-food">
+              <option>With food</option>
+              <option>Before food (30 min)</option>
+              <option>After food</option>
+              <option>Empty stomach</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="addReminder()" style="width:100%">+ Add Reminder</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       HOSPITAL FINDER
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-hospital">
+    <h2>Hospital Finder</h2>
+    <p class="sub">AI detects when self-care is insufficient. Find nearest hospitals by specialty.</p>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="grid-2" style="margin-bottom:12px">
+        <div>
+          <label>Specialty Needed</label>
+          <select id="specialty" onchange="filterHospitals()">
+            <option value="all">All Specialties</option>
+            <option value="general">General Medicine</option>
+            <option value="cardiac">Cardiology</option>
+            <option value="diabetes">Diabetology / Endocrinology</option>
+            <option value="emergency">Emergency / 24×7</option>
+            <option value="ortho">Orthopaedics</option>
+          </select>
+        </div>
+        <div>
+          <label>Your Location</label>
+          <input type="text" value="📍 Rohini, New Delhi — Detected" readonly style="color:var(--cyan)">
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="filterHospitals()">🔍 Find Hospitals</button>
+    </div>
+
+    <div class="map-placeholder">
+      <div class="map-pin">🗺️</div>
+      <div>Interactive map — Google Maps API integration</div>
+      <div style="font-size:12px">Showing hospitals within 10 km radius</div>
+    </div>
+
+    <div class="section-label">Nearest Hospitals</div>
+    <div id="hospital-list">
+      <div class="hospital-item">
+        <div class="hosp-icon">🏥</div>
+        <div>
+          <div class="hosp-name">Fortis Hospital, Shalimar Bagh</div>
+          <div class="hosp-sub">General · Cardiology · Emergency 24×7 · ★ 4.5</div>
+        </div>
+        <div class="hosp-dist">1.2 km</div>
+      </div>
+      <div class="hospital-item">
+        <div class="hosp-icon">🏥</div>
+        <div>
+          <div class="hosp-name">Max Super Speciality, Pitampura</div>
+          <div class="hosp-sub">Cardiology · Diabetology · Ortho · ★ 4.3</div>
+        </div>
+        <div class="hosp-dist">2.7 km</div>
+      </div>
+      <div class="hospital-item">
+        <div class="hosp-icon">🏥</div>
+        <div>
+          <div class="hosp-name">Deep Chand Bandhu Govt. Hospital</div>
+          <div class="hosp-sub">General · Emergency · Government · ★ 3.8</div>
+        </div>
+        <div class="hosp-dist">3.1 km</div>
+      </div>
+      <div class="hospital-item">
+        <div class="hosp-icon">💊</div>
+        <div>
+          <div class="hosp-name">Apollo Clinic, Rohini Sector 7</div>
+          <div class="hosp-sub">General Medicine · Diabetology · ★ 4.1</div>
+        </div>
+        <div class="hosp-dist">0.8 km</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       HEAL TOGETHER
+  ══════════════════════════════════════ -->
+  <div class="screen" id="screen-heal">
+    <h2>HealTogether — Survivor Connect</h2>
+    <p class="sub">Connect with verified survivors for support, guidance & shared experiences. AI-moderated for safety.</p>
+
+    <div class="grid-2" style="align-items:start">
+      <div>
+        <div class="section-label">Verified Mentors</div>
+        <div class="mentor-card">
+          <div class="mentor-av" style="background:rgba(0,255,135,0.1);font-size:24px">👩</div>
+          <div>
+            <div class="mentor-name">Priya S.</div>
+            <div class="mentor-meta">Type 2 Diabetes · 6 years · Delhi</div>
+            <div class="mentor-tags">
+              <span class="mentor-tag">Insulin management</span>
+              <span class="mentor-tag">Diet tips</span>
+              <span class="mentor-tag">Hindi</span>
+            </div>
+            <button class="btn btn-ghost" style="margin-top:10px;font-size:12px;padding:6px 14px" onclick="openChat('Priya S.')">💬 Connect</button>
+          </div>
+        </div>
+
+        <div class="mentor-card">
+          <div class="mentor-av" style="background:rgba(0,229,255,0.1);font-size:24px">👨</div>
+          <div>
+            <div class="mentor-name">Ramesh K.</div>
+            <div class="mentor-meta">Post Cardiac Stent · 3 years · Mumbai</div>
+            <div class="mentor-tags">
+              <span class="mentor-tag">Heart health</span>
+              <span class="mentor-tag">Blood thinners</span>
+              <span class="mentor-tag">Lifestyle</span>
+            </div>
+            <button class="btn btn-ghost" style="margin-top:10px;font-size:12px;padding:6px 14px" onclick="openChat('Ramesh K.')">💬 Connect</button>
+          </div>
+        </div>
+
+        <div class="mentor-card">
+          <div class="mentor-av" style="background:rgba(255,107,0,0.1);font-size:24px">👩‍🦳</div>
+          <div>
+            <div class="mentor-name">Sunita M.</div>
+            <div class="mentor-meta">Breast Cancer Survivor · 2 years · Pune</div>
+            <div class="mentor-tags">
+              <span class="mentor-tag">Chemo support</span>
+              <span class="mentor-tag">Mental wellness</span>
+              <span class="mentor-tag">Nutrition</span>
+            </div>
+            <button class="btn btn-ghost" style="margin-top:10px;font-size:12px;padding:6px 14px" onclick="openChat('Sunita M.')">💬 Connect</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label" id="chat-label">Chat — <span id="chat-name">Select a mentor to begin</span></div>
+        <div class="chat-box">
+          <div class="chat-messages" id="chat-messages">
+            <div style="text-align:center;color:var(--muted);font-size:13px;padding:40px 0">Click "Connect" on a mentor to start chatting</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+            <button class="btn btn-primary" onclick="sendMsg()" style="flex-shrink:0;padding:11px 16px">➤</button>
+          </div>
+        </div>
+
+        <div class="alert alert-info" style="font-size:12px">
+          🤖 All chats are AI-moderated for safety. Conversations are anonymous by default. Mentors are verified platform users only.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+  // ── NAV ──
+  function showScreen(id, btn) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+    if (btn) btn.classList.add('active');
+    const titles = {
+      home: 'Home', prescription: 'Prescription Analyzer',
+      interaction: 'Drug Interaction Checker', nature: 'NatureCure Recommender',
+      reminders: 'Medicine Reminders', hospital: 'Hospital Finder', heal: 'HealTogether'
+    };
+    document.getElementById('page-title').textContent = titles[id] || id;
+  }
+
+  // ── PRESCRIPTION ANALYSIS SIMULATION ──
+  function simulateAnalysis() {
+    const zone = document.getElementById('upload-zone');
+    const loading = document.getElementById('analysis-loading');
+    const result = document.getElementById('analysis-result');
+    zone.style.display = 'none';
+    loading.style.display = 'block';
+    result.classList.remove('show');
+    let w = 0;
+    const prog = document.getElementById('analysis-progress');
+    const iv = setInterval(() => {
+      w = Math.min(w + Math.random() * 15, 95);
+      prog.style.width = w + '%';
+    }, 200);
+    setTimeout(() => {
+      clearInterval(iv);
+      prog.style.width = '100%';
+      setTimeout(() => {
+        loading.style.display = 'none';
+        result.classList.add('show');
+      }, 400);
+    }, 2800);
+  }
+
+  // ── INTERACTION CHECKER ──
+  function checkInteractions() {
+    const d1 = document.getElementById('drug1').value.trim();
+    const d2 = document.getElementById('drug2').value.trim();
+    if (!d1 || !d2) { alert('Enter at least 2 medicines'); return; }
+    const el = document.getElementById('interaction-result');
+    el.style.display = 'none';
+    setTimeout(() => { el.style.display = 'block'; el.style.animation = 'fadeIn 0.3s ease'; }, 300);
+  }
+
+  // ── NATURE CURE ──
+  const remedyData = {
+    cold: {
+      mild: [
+        { icon: '🍯', name: 'Honey + Ginger Tea', desc: 'Mix 1 tsp honey with fresh grated ginger in warm water. Drink 2–3 times a day. Soothes inflammation and boosts immunity.' },
+        { icon: '💨', name: 'Steam Inhalation', desc: 'Inhale steam with a few drops of eucalyptus oil for 10 mins. Clears nasal congestion effectively.' },
+        { icon: '🌶️', name: 'Turmeric Milk', desc: 'Add ½ tsp turmeric to warm milk before bed. Anti-inflammatory — helps recover faster.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Consider OTC', desc: 'Cetirizine 10mg or Loratadine may help. Steam + rest advised.' }],
+      serious: []
+    },
+    fever: {
+      mild: [
+        { icon: '🧊', name: 'Cold Compress', desc: 'Apply a cool, damp cloth to forehead and wrists to reduce body temperature naturally.' },
+        { icon: '💧', name: 'Hydrate + Rest', desc: 'Drink plenty of water, coconut water, or ORS. Fever causes dehydration — fluids are key.' },
+        { icon: '🍃', name: 'Tulsi + Pepper Decoction', desc: 'Boil 10 tulsi leaves with 5 peppercorns and drink warm. Traditional fever management.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Paracetamol 500mg', desc: 'Safe OTC option. Take every 6 hours. If fever exceeds 103°F, see a doctor.' }],
+      serious: []
+    },
+    headache: {
+      mild: [
+        { icon: '🌿', name: 'Peppermint Oil', desc: 'Apply diluted peppermint oil to temples and forehead. Provides cooling relief in 15–20 mins.' },
+        { icon: '💧', name: 'Hydration', desc: 'Dehydration is the #1 cause of headaches. Drink 2 glasses of water and rest.' },
+        { icon: '🧘', name: 'Temple Massage', desc: 'Gently massage temples in circular motion for 5 mins. Relieves tension headaches.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Paracetamol / Ibuprofen', desc: 'Paracetamol 500–1000mg or Ibuprofen 400mg. Avoid if on blood thinners.' }],
+      serious: []
+    },
+    acidity: {
+      mild: [
+        { icon: '🥛', name: 'Cold Milk', desc: 'Drink a glass of cold milk. Neutralizes stomach acid quickly and provides immediate relief.' },
+        { icon: '🌿', name: 'Ajwain (Carom Seeds)', desc: 'Chew ½ tsp ajwain seeds with a pinch of salt and warm water. Excellent digestive aid.' },
+        { icon: '🍌', name: 'Banana', desc: 'Eat a ripe banana — its natural antacids protect the stomach lining from acid.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Antacids / Pantoprazole', desc: 'OTC antacids like Digene or Gelusil give quick relief. Pantoprazole 40mg for recurring acidity.' }],
+      serious: []
+    },
+    cough: {
+      mild: [
+        { icon: '🍋', name: 'Honey + Lemon + Ginger', desc: 'Mix 1 tsp honey, few drops of lemon juice and ginger juice in warm water. Sip slowly 3x a day.' },
+        { icon: '🌶️', name: 'Turmeric Milk (Haldi Doodh)', desc: 'Warm milk with turmeric at bedtime reduces dry cough and throat irritation.' },
+        { icon: '🧄', name: 'Garlic Tea', desc: 'Boil 2–3 garlic cloves in water, add honey. Garlic has natural antibacterial properties.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Cough Syrup / Dextromethorphan', desc: 'OTC Benadryl or Corex (with doctor advice). Avoid in children under 12.' }],
+      serious: []
+    },
+    'sore-throat': {
+      mild: [
+        { icon: '🧂', name: 'Salt Water Gargle', desc: 'Mix ½ tsp salt in warm water and gargle for 30 seconds. Reduces swelling and kills bacteria.' },
+        { icon: '🍵', name: 'Licorice Root Tea', desc: 'Mulethi (licorice) tea soothes throat lining — anti-inflammatory and antimicrobial.' },
+        { icon: '🍯', name: 'Honey + Warm Water', desc: 'Sip slowly. Honey coats the throat and has antibacterial properties.' },
+      ],
+      moderate: [{ icon: '💊', name: 'Strepsils / Betadine Gargle', desc: 'OTC throat lozenges or Betadine gargle. If fever accompanies, see a doctor.' }],
+      serious: []
+    }
+  };
+
+  let currentSeverity = 'mild';
+  function setSeverity(s) {
+    currentSeverity = s;
+    ['mild','moderate','serious'].forEach(x => {
+      document.getElementById('sev-'+x.substring(0,3+(x==='moderate'?5:0))).className = 'sev-btn';
+    });
+    document.getElementById('sev-mild').className = 'sev-btn' + (s==='mild'?' active-mild':'');
+    document.getElementById('sev-mod').className = 'sev-btn' + (s==='moderate'?' active-mod':'');
+    document.getElementById('sev-serious').className = 'sev-btn' + (s==='serious'?' active-serious':'');
+    showRemedies();
+  }
+
+  function showRemedies() {
+    const sym = document.getElementById('symptom-select').value;
+    if (!sym) return;
+    const data = remedyData[sym];
+    if (!data) return;
+    document.getElementById('remedy-results').style.display = 'block';
+    const list = document.getElementById('remedy-list');
+    const otc = document.getElementById('otc-advice');
+    const doc = document.getElementById('doctor-advice');
+    otc.style.display = 'none';
+    doc.style.display = 'none';
+    list.innerHTML = '';
+
+    if (currentSeverity === 'serious') {
+      doc.style.display = 'flex';
+      doc.style.background = 'rgba(255,45,120,0.08)';
+      doc.style.border = '1px solid rgba(255,45,120,0.2)';
+      doc.style.color = 'var(--pink)';
+      list.innerHTML = '';
+    } else if (currentSeverity === 'moderate') {
+      otc.style.display = 'flex';
+      if (data.moderate) {
+        data.moderate.forEach(r => {
+          list.innerHTML += `<div class="remedy-card"><div class="remedy-icon">${r.icon}</div><div><div class="remedy-name" style="color:var(--yellow)">${r.name}</div><div class="remedy-desc">${r.desc}</div></div></div>`;
+        });
+      }
+    } else {
+      const items = data.mild || [];
+      items.forEach(r => {
+        list.innerHTML += `<div class="remedy-card"><div class="remedy-icon">${r.icon}</div><div><div class="remedy-name">${r.name}</div><div class="remedy-desc">${r.desc}</div></div></div>`;
+      });
+    }
+  }
+
+  // ── REMINDERS ──
+  function toggleReminder(btn) {
+    btn.classList.toggle('on');
+  }
+
+  function addReminder() {
+    const med = document.getElementById('new-med').value.trim();
+    const time = document.getElementById('new-time').value;
+    const food = document.getElementById('new-food').value;
+    if (!med || !time) { alert('Enter medicine name and time'); return; }
+    const list = document.getElementById('reminder-list');
+    const [h, m] = time.split(':');
+    const hour = parseInt(h);
+    const timeStr = (hour > 12 ? hour - 12 : hour) + ':' + m + ' ' + (hour >= 12 ? 'PM' : 'AM');
+    const item = document.createElement('div');
+    item.className = 'reminder-item';
+    item.style.animation = 'fadeIn 0.3s ease';
+    item.innerHTML = `
+      <div><div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px">◯ PENDING</div></div>
+      <div class="reminder-time">${timeStr}</div>
+      <div>
+        <div class="reminder-name">${med}</div>
+        <div class="reminder-sub">${food}</div>
+      </div>
+      <button class="reminder-toggle" onclick="toggleReminder(this)"></button>
+    `;
+    list.appendChild(item);
+    document.getElementById('new-med').value = '';
+  }
+
+  // ── HOSPITAL FINDER ──
+  function filterHospitals() {
+    // In full build, this would call Google Maps API
+    // For prototype, just animate the existing list
+    const list = document.getElementById('hospital-list');
+    list.style.opacity = '0.4';
+    setTimeout(() => { list.style.opacity = '1'; list.style.transition = 'opacity 0.3s'; }, 600);
+  }
+
+  // ── CHAT ──
+  let chatPartner = null;
+  const chatIntros = {
+    'Priya S.': "Hi! I'm Priya. I've been managing Type 2 diabetes for 6 years now. What would you like to know? 😊",
+    'Ramesh K.': "Hello! Ramesh here. Had a cardiac stent 3 years ago — life's much better now. Ask me anything about heart health.",
+    'Sunita M.': "Hi there. I'm Sunita — 2 years cancer-free! Happy to share my experience and support you. You're not alone. 💪"
+  };
+
+  function openChat(name) {
+    chatPartner = name;
+    document.getElementById('chat-name').textContent = name;
+    const msgs = document.getElementById('chat-messages');
+    msgs.innerHTML = '';
+    const intro = chatIntros[name] || 'Hello! How can I help you today?';
+    addMsg(intro, 'them', name.split(' ')[0]);
+  }
+
+  function addMsg(text, from, name) {
+    const msgs = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'msg msg-' + from;
+    const now = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    div.innerHTML = `<div class="msg-bubble">${text}</div><div class="msg-meta">${from === 'them' ? name + ' · ' : ''}${now}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  const autoReplies = [
+    "That's a great question! Based on my experience, consistency with medication timing made the biggest difference for me.",
+    "I totally understand. It took me a while too. The key is not to miss doses — even one missed dose can affect your levels.",
+    "Have you talked to your doctor about this? I'd definitely recommend bringing it up at your next visit.",
+    "That's very common. Many of us in the community have faced the same thing. You're not alone in this!",
+    "I found that keeping a simple diary of symptoms and medicines helped me communicate better with my doctor.",
+  ];
+  let replyIdx = 0;
+
+  function sendMsg() {
+    if (!chatPartner) { alert('Please select a mentor first'); return; }
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    addMsg(text, 'me', 'You');
+    input.value = '';
+    setTimeout(() => {
+      const reply = autoReplies[replyIdx % autoReplies.length];
+      replyIdx++;
+      addMsg(reply, 'them', chatPartner.split(' ')[0]);
+    }, 1000 + Math.random() * 800);
+  }
+</script>
+</body>
+</html>
